@@ -40,7 +40,9 @@ class AIAgent:
     def __init__(self):
         self.use_openai = openai is not None and os.getenv('OPENAI_API_KEY')
         if self.use_openai:
-            openai.api_key = os.getenv('OPENAI_API_KEY')
+            self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        else:
+            self.client = None
 
     def generate_trade(self, last_price: float) -> str:
         if self.use_openai:
@@ -49,12 +51,12 @@ class AIAgent:
                 "Should we 'buy', 'sell', or 'hold'?"
             )
             try:
-                response = openai.ChatCompletion.create(
+                response = self.client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=1,
                 )
-                decision = response.choices[0].message["content"].strip().lower()
+                decision = response.choices[0].message.content.strip().lower()
                 if decision not in {"buy", "sell", "hold"}:
                     decision = "hold"
             except Exception as exc:

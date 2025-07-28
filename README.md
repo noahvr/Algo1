@@ -8,6 +8,8 @@ This project provides a simple algorithmic trading bot that interacts with the A
    ```bash
    pip install -r requirements.txt
    ```
+   This project requires `openai>=1.0` and uses the new `OpenAI` client
+   interface. Older code relying on `openai.ChatCompletion` will not work.
 3. Run the bot:
    ```bash
    python main.py
