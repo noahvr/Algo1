@@ -1,6 +1,7 @@
 import os
-import time
 import logging
+import tkinter as tk
+
 from dotenv import load_dotenv
 from ratelimit import limits, sleep_and_retry
 
@@ -89,23 +90,73 @@ class Trader:
             time_in_force='gtc',
         )
 
+    def get_portfolio_str(self) -> str:
+        account = safe_api_call(self.api.get_account)
+        positions = safe_api_call(self.api.list_positions)
+        lines = [f"Cash: {account.cash}", "Positions:"]
+        for p in positions:
+            lines.append(f"{p.symbol} {p.qty} @ {p.current_price}")
+        return "\n".join(lines)
+
+    def step(self) -> tuple[str, float]:
+        price = self.get_price()
+        decision = self.ai.generate_trade(price)
+        logging.info(f"Price: {price:.2f} Decision: {decision}")
+        if decision in {'buy', 'sell'}:
+            self.submit_order(decision, qty=1)
+        return decision, price
+
+
+class TradingApp:
+    def __init__(self, trader: Trader):
+        self.trader = trader
+        self.root = tk.Tk()
+        self.root.title("Algo1 Trading Bot")
+
+        self.price_var = tk.StringVar(value="Price: --")
+        tk.Label(self.root, textvariable=self.price_var, font=("Arial", 16)).pack()
+
+        self.strategy_var = tk.StringVar(value="Decision: --")
+        tk.Label(self.root, textvariable=self.strategy_var, font=("Arial", 14)).pack()
+
+        tk.Label(self.root, text="Update Interval (seconds)").pack()
+        self.interval_var = tk.IntVar(value=60)
+        tk.Scale(
+            self.root,
+            from_=5,
+            to=300,
+            orient=tk.HORIZONTAL,
+            variable=self.interval_var,
+        ).pack(fill="x")
+
+        tk.Label(self.root, text="Portfolio").pack()
+        self.portfolio_text = tk.Text(self.root, height=10, width=50)
+        self.portfolio_text.pack()
+
+        self.update_data()
+
+    def update_data(self):
+        try:
+            decision, price = self.trader.step()
+            self.price_var.set(f"Price: {price:.2f}")
+            self.strategy_var.set(f"Decision: {decision}")
+            portfolio = self.trader.get_portfolio_str()
+            self.portfolio_text.delete(1.0, tk.END)
+            self.portfolio_text.insert(tk.END, portfolio)
+        except Exception as exc:
+            logging.error(f"GUI update error: {exc}")
+
+        interval = self.interval_var.get()
+        self.root.after(interval * 1000, self.update_data)
+
     def run(self):
-        logging.info("Starting trading loop")
-        while True:
-            try:
-                price = self.get_price()
-                decision = self.ai.generate_trade(price)
-                logging.info(f"Price: {price:.2f} Decision: {decision}")
-                if decision in {'buy', 'sell'}:
-                    self.submit_order(decision, qty=1)
-            except Exception as e:
-                logging.error(f"Error during trading loop: {e}")
-            time.sleep(60)
+        self.root.mainloop()
 
 def main():
     symbol = os.getenv('TRADE_SYMBOL', 'AAPL')
     trader = Trader(symbol)
-    trader.run()
+    app = TradingApp(trader)
+    app.run()
 
 if __name__ == '__main__':
     main()
