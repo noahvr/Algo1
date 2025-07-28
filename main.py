@@ -75,7 +75,7 @@ class Trader:
         self.ai = AIAgent()
 
     def get_price(self) -> float:
-        trade = safe_api_call(self.api.get_last_trade, self.symbol)
+        trade = safe_api_call(self.api.get_latest_trade, self.symbol)
         return float(trade.price)
 
     def submit_order(self, side: str, qty: int):
